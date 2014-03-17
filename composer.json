@@ -1,0 +1,12 @@
+{
+    "name": "sarelvdwalt/SFArchiveBundle",
+    "description": "Bundle to archive tables using different strategies",
+    "minimum-stability": "dev",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sarel van der Walt",
+            "email": "sarel.w@gmail.com"
+        }
+    ]
+}
