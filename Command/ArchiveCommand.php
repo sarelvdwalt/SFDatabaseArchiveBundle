@@ -2,7 +2,9 @@
 
 namespace AH\Service\ArchivingBundle\Command;
 
+use Doctrine\DBAL\Statement;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Helper\TableHelper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -52,7 +54,11 @@ class ArchiveCommand extends ContainerAwareCommand {
             ->addOption('destination-entity-manager', null,
                 InputOption::VALUE_REQUIRED,
                 'Destination Entity Manager to archive to. If none is provided, the same as --source-entity-manager will be used.',
-                'default');
+                'default')
+            ->addOption('select-size', null,
+                InputOption::VALUE_REQUIRED,
+                'The amount of data to select from the source at a time. This is different to batch, this as an example selects 9999 entries by default, and it goes through it in batches of 100 by default',
+                9999);
     }
 
     /**
@@ -60,6 +66,18 @@ class ArchiveCommand extends ContainerAwareCommand {
      * @param OutputInterface $output
      */
     protected function initialize(InputInterface $input, OutputInterface $output) {
+        $table1 = $this->getHelperSet()->get('table');
+        $table2 = $this->getHelperSet()->get('table');
+        /* @var $table TableHelper */
+
+        $table1->setHeaders(array_keys($input->getArguments()))
+            ->addRow($input->getArguments())
+            ->render($output);
+
+        $table2->setHeaders(array_keys($input->getOptions()))
+            ->addRow($input->getoptions())
+            ->render($output);
+
         $this->env = $input->getOption('env');
 
         if ($this->env != 'prod') {
@@ -83,7 +101,7 @@ class ArchiveCommand extends ContainerAwareCommand {
 
         $this->strategy_value = $input->getOption('strategy-z-tables');
 
-        $this->select_limit = 10000;
+        $this->select_limit = $input->getOption('select-size');
 
         $this->days = $input->getOption('days');
 
@@ -97,51 +115,65 @@ class ArchiveCommand extends ContainerAwareCommand {
      * @return int|null|void
      */
     protected function execute(InputInterface $input, OutputInterface $output) {
-        $sql = 'select * from ' . $this->table_source . ' where created_at <= date_sub(now(), interval '.$this->days.' day) limit ' . $this->select_limit;
+        $sql = 'select * from ' . $this->table_source . ' where created_at <= date_sub(now(), interval ' . $this->days . ' day) limit ' . $this->select_limit;
         $stmt = $this->em_source->getConnection()->prepare($sql);
         $stmt->execute();
 
-        while ($row = $stmt->fetch()) {
+        while ($stmt->rowCount() > 0) {
+            $this->output->writeln('<info>' . $stmt->rowCount() . ' rows selected from '
+                . $this->table_source . '. Commencing archiving in batches of ' . $this->batch_size
+                . ' [Memory Footprint: ' . round(memory_get_usage() / pow(2, 10), 2) . ' MB]'
+                . '</info>');
 
-            $table_dest = 'z' . $this->table_source . date($this->strategy_value, strtotime($row['created_at']));
-            if (!$this->destinationTableExists($table_dest)) {
-                $this->destinationTableCreate($table_dest);
+            while ($row = $stmt->fetch()) {
+
+                $table_dest = 'z' . $this->table_source . date($this->strategy_value, strtotime($row['created_at']));
+                if (!$this->destinationTableExists($table_dest)) {
+                    $this->destinationTableCreate($table_dest);
+                }
+
+                $sql = 'replace into ' . $table_dest . ' values (';
+                $sql .= ':' . implode(', :', array_keys($row));
+                $sql .= ')';
+
+                if ($output->isDebug()) {
+                    $output->writeln($sql . ' [' . implode(',', $row) . ']');
+                }
+
+                $stmt_replace = $this->em_dest->getConnection()->prepare($sql);
+
+                $this->em_dest->getConnection()->getConfiguration()->setSQLLogger(null);
+
+                if ($this->env == 'prod') {
+                    $stmt_replace->execute($row);
+                    /* @var $stmt_replace Statement */
+                    $stmt_replace->closeCursor();
+                }
+
+                $this->cache_current_batch_ids[] = $row['id'];
+
+                // Check if we're busting the batch size, if so delete from source:
+                if ($idsCount = count($this->cache_current_batch_ids) >= $this->batch_size) {
+                    $this->deleteBatch();
+                }
             }
 
-            $sql = 'replace into ' . $table_dest . ' values (';
-            $sql .= ':' . implode(', :', array_keys($row));
-            $sql .= ')';
+            // Delete what we have done from the source:
+            $this->deleteBatch();
 
-            if ($output->isDebug()) {
-                $output->writeln($sql.' ['.implode(',', $row).']');
-            }
-
-            $stmt_replace = $this->em_dest->getConnection()->prepare($sql);
-
-            if ($this->env == 'prod') {
-                $stmt_replace->execute($row);
-            }
-
-            $this->cache_current_batch_ids[] = $row['id'];
-
-            // Check if we're busting the batch size, if so delete from source:
-            if ($idsCount = count($this->cache_current_batch_ids) >= $this->batch_size) {
-                $this->deleteBatch();
-            }
+            // Execute another one, so we can get more results:
+            $stmt->execute();
         }
-
-        // Delete what we have done from the source:
-        $this->deleteBatch();
     }
 
-    private function deleteBatch () {
+    private function deleteBatch() {
         if (count($this->cache_current_batch_ids) <= 0) {
             return;
         }
 
-        $this->output->write('Deleting batch of '.count($this->cache_current_batch_ids).' entries... ');
+        $this->output->write('Deleting batch of ' . count($this->cache_current_batch_ids) . ' entries... ');
 
-        $sql = 'delete from '.$this->table_source.' where id in ('.implode(',', $this->cache_current_batch_ids).')';
+        $sql = 'delete from ' . $this->table_source . ' where id in (' . implode(',', $this->cache_current_batch_ids) . ')';
         $stmt = $this->em_source->getConnection()->prepare($sql);
         if ($this->env == 'prod') {
             $stmt->execute();
@@ -161,7 +193,7 @@ class ArchiveCommand extends ContainerAwareCommand {
     private function destinationTableExists($v) {
         if (!array_key_exists($v, $this->cache_table_existence) || $this->cache_table_existence[$v] !== true) {
             if ($this->output->isVerbose()) {
-                $this->output->writeln('<info>Checking if '.$v.' exists in destination db.</info>');
+                $this->output->writeln('<info>Checking if ' . $v . ' exists in destination db.</info>');
             }
 
             $sql = 'show tables like \'' . $v . '\'';
@@ -196,7 +228,7 @@ class ArchiveCommand extends ContainerAwareCommand {
 
         // Create the new table:
         if ($this->output->isVerbose()) {
-            $this->output->writeln('<comment>Creating table '.$v.' in destination db.</comment>');
+            $this->output->writeln('<comment>Creating table ' . $v . ' in destination db.</comment>');
         }
         $stmt = $this->em_dest->getConnection()->prepare($SQL_CREATE_DB);
         if ($this->env == 'prod') {
