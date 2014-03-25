@@ -19,6 +19,7 @@ class ArchiveCommand extends ContainerAwareCommand {
     protected $strategy_value = null;
     protected $select_limit = null;
     protected $days = null;
+    protected $timeout_cutoff = null;
 
     protected $env = null;
 
@@ -58,7 +59,11 @@ class ArchiveCommand extends ContainerAwareCommand {
             ->addOption('select-size', null,
                 InputOption::VALUE_REQUIRED,
                 'The amount of data to select from the source at a time. This is different to batch, this as an example selects 9999 entries by default, and it goes through it in batches of 100 by default',
-                9999);
+                9999)
+            ->addOption('timeout', null,
+                InputOption::VALUE_REQUIRED,
+                'The script should not run indefinitely, thus will kill itself after running for a certain amount of time (in seconds)',
+                1800);
     }
 
     /**
@@ -106,6 +111,8 @@ class ArchiveCommand extends ContainerAwareCommand {
         $this->days = $input->getOption('days');
 
         $this->table_source = $input->getArgument('table_name');
+
+        $this->timeout_cutoff = strtotime('now') + $input->getOption('timeout');
     }
 
     /**
@@ -126,6 +133,13 @@ class ArchiveCommand extends ContainerAwareCommand {
                 . '</info>');
 
             while ($row = $stmt->fetch()) {
+
+                // Timeout check:
+                if (strtotime('now') > $this->timeout_cutoff) {
+                    $output->writeln('<error>Timeout Reached. Bailing out until next run.</error>');
+
+                    break 2;
+                }
 
                 $table_dest = 'z' . $this->table_source . date($this->strategy_value, strtotime($row['created_at']));
                 if (!$this->destinationTableExists($table_dest)) {
