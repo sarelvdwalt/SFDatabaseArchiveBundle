@@ -20,6 +20,7 @@ class ArchiveCommand extends ContainerAwareCommand {
     protected $select_limit = null;
     protected $days = null;
     protected $timeout_cutoff = null;
+    protected $date_field = null;
 
     protected $env = null;
 
@@ -60,6 +61,10 @@ class ArchiveCommand extends ContainerAwareCommand {
                 InputOption::VALUE_REQUIRED,
                 'The amount of data to select from the source at a time. This is different to batch, this as an example selects 9999 entries by default, and it goes through it in batches of 100 by default',
                 9999)
+            ->addOption('date-field', null,
+                InputOption::VALUE_REQUIRED,
+                'Field to use in where clause to evaluate against the "days" field',
+                'created_at')
             ->addOption('timeout', null,
                 InputOption::VALUE_REQUIRED,
                 'The script should not run indefinitely, thus will kill itself after running for a certain amount of time (in seconds)',
@@ -113,6 +118,8 @@ class ArchiveCommand extends ContainerAwareCommand {
         $this->table_source = $input->getArgument('table_name');
 
         $this->timeout_cutoff = strtotime('now') + $input->getOption('timeout');
+
+        $this->date_field = $input->getOption('date-field');
     }
 
     /**
@@ -122,7 +129,7 @@ class ArchiveCommand extends ContainerAwareCommand {
      * @return int|null|void
      */
     protected function execute(InputInterface $input, OutputInterface $output) {
-        $sql = 'select * from ' . $this->table_source . ' where created_at <= date_sub(now(), interval ' . $this->days . ' day) limit ' . $this->select_limit;
+        $sql = 'select * from ' . $this->table_source . ' where '.$this->date_field.' <= date_sub(now(), interval ' . $this->days . ' day) limit ' . $this->select_limit;
         $stmt = $this->em_source->getConnection()->prepare($sql);
         $stmt->execute();
 
