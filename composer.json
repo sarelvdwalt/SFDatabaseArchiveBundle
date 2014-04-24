@@ -8,5 +8,8 @@
             "name": "Sarel van der Walt",
             "email": "sarel.w@gmail.com"
         }
-    ]
+    ],
+    "require": {
+        "symfony/console": "master"
+    }
 }
