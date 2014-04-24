@@ -139,8 +139,9 @@ class ArchiveCommand extends ContainerAwareCommand {
                 . ' [Memory Footprint: ' . round(memory_get_usage() / pow(2, 10), 2) . ' MB]'
                 . '</info>');
 
-            while ($row = $stmt->fetch()) {
             $showFirstRow = true;
+            $forceBreak = false;
+            while ($row = $stmt->fetch() && !$forceBreak) {
 
                 // Timeout check:
                 if (strtotime('now') > $this->timeout_cutoff) {
@@ -182,6 +183,10 @@ class ArchiveCommand extends ContainerAwareCommand {
                 // Check if we're busting the batch size, if so delete from source:
                 if ($idsCount = count($this->cache_current_batch_ids) >= $this->batch_size) {
                     $this->deleteBatch();
+
+                    if ($idsCount < $this->batch_size) {
+                        $forceBreak = true;
+                    }
                 }
             }
 
