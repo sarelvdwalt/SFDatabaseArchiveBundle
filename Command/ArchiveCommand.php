@@ -133,15 +133,14 @@ class ArchiveCommand extends ContainerAwareCommand {
         $stmt = $this->em_source->getConnection()->prepare($sql);
         $stmt->execute();
 
-        while ($stmt->rowCount() > 0) {
+        while (($rowCount = $stmt->rowCount()) > 0) {
             $this->output->writeln('<info>' . $stmt->rowCount() . ' rows selected from '
                 . $this->table_source . '. Commencing archiving in batches of ' . $this->batch_size
                 . ' [Memory Footprint: ' . round(memory_get_usage() / pow(2, 10), 2) . ' MB]'
                 . '</info>');
 
             $showFirstRow = true;
-            $forceBreak = false;
-            while ($row = $stmt->fetch() && !$forceBreak) {
+            while ($row = $stmt->fetch()) {
 
                 // Timeout check:
                 if (strtotime('now') > $this->timeout_cutoff) {
@@ -183,15 +182,16 @@ class ArchiveCommand extends ContainerAwareCommand {
                 // Check if we're busting the batch size, if so delete from source:
                 if ($idsCount = count($this->cache_current_batch_ids) >= $this->batch_size) {
                     $this->deleteBatch();
-
-                    if ($idsCount < $this->batch_size) {
-                        $forceBreak = true;
-                    }
                 }
             }
 
             // Delete what we have done from the source:
             $this->deleteBatch();
+
+            if ($rowCount < $this->select_limit) {
+                $this->output->writeln('Row count ('.$rowCount.') smaller than select-limit ('.$this->select_limit.'). We\'re done.');
+                break; // get out of the loop, as the last select we did we got less entries than we wanted, which means we're done
+            }
 
             // Execute another one, so we can get more results:
             $stmt->execute();
