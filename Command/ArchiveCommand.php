@@ -153,7 +153,7 @@ class ArchiveCommand extends ContainerAwareCommand {
                     $this->destinationTableCreate($table_dest);
                 }
 
-                $sql = 'replace into ' . $table_dest . ' values (';
+                $sql = 'replace into `' . $table_dest . '` values (';
                 $sql .= ':' . implode(', :', array_keys($row));
                 $sql .= ')';
 
