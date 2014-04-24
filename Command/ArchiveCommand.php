@@ -143,7 +143,7 @@ class ArchiveCommand extends ContainerAwareCommand {
 
                 // Timeout check:
                 if (strtotime('now') > $this->timeout_cutoff) {
-                    $output->writeln('<error>Timeout Reached. Bailing out until next run.</error>');
+                    $output->writeln('<comment>Timeout Reached. Bailing out until next run.</comment>');
 
                     break 2;
                 }
