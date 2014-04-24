@@ -140,6 +140,7 @@ class ArchiveCommand extends ContainerAwareCommand {
                 . '</info>');
 
             while ($row = $stmt->fetch()) {
+            $showFirstRow = true;
 
                 // Timeout check:
                 if (strtotime('now') > $this->timeout_cutoff) {
@@ -148,7 +149,12 @@ class ArchiveCommand extends ContainerAwareCommand {
                     break 2;
                 }
 
-                $table_dest = 'z' . $this->table_source . date($this->strategy_value, strtotime($row['created_at']));
+                if ($showFirstRow) {
+                    $output->writeln('<info>MinID: '.$row['id'].' MinDATE: '.$row[$this->date_field].'</info>');
+                    $showFirstRow = false;
+                }
+
+                $table_dest = 'z' . $this->table_source . date($this->strategy_value, strtotime($row[$this->date_field]));
                 if (!$this->destinationTableExists($table_dest)) {
                     $this->destinationTableCreate($table_dest);
                 }
