@@ -27,7 +27,8 @@ Usage
 -----
 
 	Usage:
-	 archive:generic [--days="..."] [--strategy-z-tables[="..."]] [--strategy-source-field="..."] [--batch-size[="..."]] [--source-entity-manager="..."] [--destination-entity-manager="..."] table_name
+	 archive:generic [--days="..."] [--strategy-z-tables[="..."]] [--strategy-source-field="..."] [--batch-size[="..."]]
+	 [--source-entity-manager="..."] [--destination-entity-manager="..."] table_name
 
 	Arguments:
 	 table_name                    The name of the source table to archive
