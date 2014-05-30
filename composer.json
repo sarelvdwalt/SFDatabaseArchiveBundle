@@ -10,6 +10,6 @@
         }
     ],
     "require": {
-        "symfony/console": "master"
+        "symfony/console": "v2.4.*"
     }
 }
