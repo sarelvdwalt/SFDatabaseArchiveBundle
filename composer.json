@@ -1,6 +1,6 @@
 {
-    "name": "sarelvdwalt/SFArchiveBundle",
-    "description": "Bundle to archive tables using different strategies",
+    "name": "sarelvdwalt/db-archive-bundle",
+    "description": "Bundle to archive database tables using different strategies",
     "minimum-stability": "dev",
     "license": "MIT",
     "authors": [
