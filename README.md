@@ -50,4 +50,4 @@ Usage
 Reporting an issue or a feature request
 ---------------------------------------
 
-Please submit issues and feature requests in the [Github issue tracker](https://github.com/sarelvdwalt/SFArchiveBundle/issues).
+Please submit issues and feature requests in the [Github issue tracker](https://github.com/sarelvdwalt/SFDatabseArchiveBundle/issues).
