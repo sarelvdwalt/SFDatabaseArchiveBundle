@@ -1,5 +1,6 @@
 {
     "name": "sarelvdwalt/db-archive-bundle",
+    "version": 1.0.0,
     "description": "Bundle to archive database tables using different strategies",
     "minimum-stability": "dev",
     "license": "MIT",
