@@ -219,7 +219,7 @@ class ArchiveCommand extends ContainerAwareCommand {
     /**
      * Checks whether the destination table exists or not.
      *
-     * @param $v Table name to check
+     * @param string $v Table name to check
      * @return bool
      */
     private function destinationTableExists($v) {
@@ -241,7 +241,7 @@ class ArchiveCommand extends ContainerAwareCommand {
     /**
      * Creates a carbon copy of the original source table structure into the destination table structure (and db)
      *
-     * @param $v Table name to create
+     * @param string $v Table name to create
      */
     private function destinationTableCreate($v) {
         $sql = 'show create table ' . $this->table_source . '';
